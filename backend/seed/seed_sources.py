@@ -43,10 +43,14 @@ SOURCES = [
      "Public pathogen dashboard wound down ~July 2026; Biobot now directs users "
      "to CDC NWSS. Current public work is substance-use monitoring, not pathogens."),
 
-    (4, "CDC NSSP ED Visits", "syndromic", "CDC",
-     "https://data.cdc.gov/resource/7xva-uux8.json", "open_api", "weekly",
-     "% ED visits for COVID/flu/RSV by demographic category, national + state, "
-     "SODA REST API + CSV/JSON download. Most usable open NSSP-derived signal."),
+    (4, "CDC NSSP ED Visit Trajectories", "syndromic", "CDC",
+     "https://data.cdc.gov/resource/rdmq-nq56.json", "open_api", "weekly",
+     "CORRECTED 2026-09-18: originally documented as 7xva-uux8, but that "
+     "dataset has NO unstratified total row -- every row is split by Sex, "
+     "Age Group, or Race/Ethnicity, and it's national-only (no state/county). "
+     "rdmq-nq56 is the actual best fit: county-level (real FIPS field) percent "
+     "ED visits for COVID/Influenza/RSV, unstratified, plus a smoothed value "
+     "and trend direction per pathogen. Confirmed fresh (week_end 2026-09-12)."),
     (5, "Delphi Epidata FluView (ILINet)", "syndromic", "Delphi (CMU) / CDC",
      "https://api.delphi.cmu.edu/epidata/fluview/", "open_api", "weekly",
      "Outpatient influenza-like-illness %, national/HHS-region/state, no auth "
@@ -65,9 +69,18 @@ SOURCES = [
      "SARS-CoV-2 only, national + 10 HHS regions, ~4-week reporting lag, "
      "confirmed actively updating."),
     (9, "Nextstrain", "genomic", "Nextstrain (Fred Hutch / Bedford Lab)",
-     "https://data.nextstrain.org", "open_api", "daily_or_weekly",
-     "Phylogenetic trend builds for 21 viruses + M. tuberculosis, built on open "
-     "INSDC data, no auth. Best source for a genomic trend signal."),
+     "https://data.nextstrain.org", "open_scrape", "varies_by_build",
+     "CORRECTED 2026-09-18: freshness is NOT uniform across builds as earlier "
+     "research suggested. Checked directly: ncov_open_global.json (SARS-CoV-2) "
+     "stale since 2022-04-30; flu_seasonal_h3n2_ha_2y.json, measles.json, "
+     "rsv_a_genome.json all stale since 2024. Only mpox_all-clades.json "
+     "confirmed genuinely current (updated 2026-09-16). Also: the payload is a "
+     "full Auspice phylogenetic tree (nested clades/branches), not tabular data "
+     "-- deriving a trend metric requires tree traversal (counting tips per "
+     "clade/region/time), a materially bigger ETL than any other source here. "
+     "DEFERRED this pass; CDC Variant Proportions covers the SARS-CoV-2 variant-"
+     "share need with a simple tabular pull. Revisit for mpox specifically, or "
+     "if a dedicated tree-parsing pass is worth the investment later."),
     (10, "NCBI Virus / Datasets API", "genomic", "NIH/NLM",
      "https://api.ncbi.nlm.nih.gov/datasets/v2", "open_api", "continuous",
      "Raw sequence archive with geo/collection-date metadata; not a surveillance "

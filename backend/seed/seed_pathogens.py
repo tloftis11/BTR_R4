@@ -34,6 +34,9 @@ PATHOGENS = [
     (24, "Candida auris", "amr"),
     (25, "Carbapenem-resistant Enterobacteriaceae", "amr"),
     (26, "Viral Hemorrhagic Fever (Ebola/Marburg)", "other"),
+    (27, "Hantavirus", "other"),
+    (28, "Nipah Virus", "other"),
+    (29, "Yellow Fever", "vector_borne"),
 ]
 
 

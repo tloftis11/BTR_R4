@@ -49,6 +49,9 @@ uv run python -m seed.seed_geo
 
 # Pull real data (each hits a live public API)
 uv run python -m etl.wastewater --weeks 12
+uv run python -m etl.syndromic --weeks 12
+uv run python -m etl.genomic --weeks 26
+uv run python -m etl.travel --weeks 26
 
 uv run uvicorn main:app --reload   # http://localhost:8000
 ```
@@ -56,9 +59,16 @@ uv run uvicorn main:app --reload   # http://localhost:8000
 ## Status
 
 - [x] Schema designed and validated
-- [x] Wastewater ETL (CDC Wastewater Viral Activity Level)
-- [ ] Syndromic ETL (NSSP ED Visits + Delphi FluView)
-- [ ] Genomic ETL (CDC Variant Proportions + Nextstrain)
-- [ ] Travel ETL (BTS passenger volumes + WHO DON)
+- [x] Wastewater ETL — CDC Wastewater Viral Activity Level (35,009 rows)
+- [x] Syndromic ETL — NSSP ED Visit Trajectories + Delphi FluView (83,462 rows)
+- [x] Genomic ETL — CDC Variant Proportions (1,491 rows); Nextstrain deferred
+      (most builds checked were stale; would need phylogenetic tree parsing)
+- [x] Travel ETL — BTS passenger volumes + WHO Disease Outbreak News (91 rows)
 - [ ] Frontend map
 - [ ] Composite scoring layer (deferred — HermesBoost integration TBD)
+
+**120,053 real observations loaded** across all 4 domains as of 2026-09-18.
+Several sources required correcting mid-build after the originally-researched
+dataset turned out to be stale or a poor fit once actually queried — see
+`backend/seed/seed_sources.py` for the full, honest trail (what was checked,
+what changed, and why) rather than a static list of "sources used."
