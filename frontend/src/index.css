@@ -1,0 +1,6 @@
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: 'Trebuchet MS', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

@@ -29,14 +29,21 @@ def map_states():
     con = get_connection()
 
     # Wastewater: already state-level. Latest wval per state, this pathogen.
+    # NOTE: deliberately not using QUALIFY here -- on this DuckDB version it
+    # returned extra hidden columns (7 instead of the 3 selected), breaking
+    # tuple unpacking. The explicit CTE + ROW_NUMBER + WHERE rn=1 pattern used
+    # elsewhere in this file doesn't have that problem.
     wastewater = con.execute(
         """
-        SELECT g.geo_name AS state, f.metric_value, f.period_end
-        FROM fact_observation f
-        JOIN dim_geo g ON f.geo_id = g.geo_id
-        JOIN dim_pathogen p ON f.pathogen_id = p.pathogen_id
-        WHERE f.domain = 'wastewater' AND p.canonical_name = ?
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY g.geo_code ORDER BY f.period_end DESC) = 1
+        WITH latest_per_state AS (
+            SELECT g.geo_name AS state, f.metric_value, f.period_end,
+                   ROW_NUMBER() OVER (PARTITION BY g.geo_id ORDER BY f.period_end DESC) AS rn
+            FROM fact_observation f
+            JOIN dim_geo g ON f.geo_id = g.geo_id
+            JOIN dim_pathogen p ON f.pathogen_id = p.pathogen_id
+            WHERE f.domain = 'wastewater' AND p.canonical_name = ?
+        )
+        SELECT state, metric_value, period_end FROM latest_per_state WHERE rn = 1
         """,
         [SARS_COV_2],
     ).fetchall()
