@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from api.sources import router as sources_router
+from api.map import router as map_router
 
 app = FastAPI(
     title="Biothreat Radar API",
@@ -29,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(sources_router)
+app.include_router(map_router)
 
 
 @app.get("/health")
