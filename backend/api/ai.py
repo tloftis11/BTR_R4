@@ -237,44 +237,77 @@ def briefing(state: str | None = None, regenerate: bool = False):
 
     payload = build_states_payload(con)
 
+    # Lead with external/global alerts, domestic surveillance second: per
+    # explicit direction, the wastewater/syndromic/genomic numbers are
+    # already visible on the map and state panels elsewhere in the app --
+    # the briefing's actual unique value is the threat intelligence that
+    # ISN'T easy to find elsewhere (global alerts, live search findings).
     if state:
         signals = payload.get(state)
         if signals is None:
             raise HTTPException(status_code=404, detail=f"No data for state '{state}'")
         data_context = _format_state_signals(state, signals)
         scope_instruction = (
-            f"Write a multi-paragraph briefing on {state}'s current biothreat picture, "
-            "covering wastewater, syndromic, and genomic trends from the data below, with "
-            "specific numbers. Then use web search to check for any current, state-specific "
-            f"health department alerts for {state}, or global emerging threats with genuine "
-            f"relevance to {state} (e.g. via its international travel connections) that "
-            "aren't already covered by the loaded data below. It's fine to find nothing new "
-            "via search -- don't force a connection that isn't there."
+            f"Structure this briefing on {state} in two sections, IN THIS ORDER:\n\n"
+            f"1. RELEVANT EXTERNAL ALERTS (lead with this, most substantial section): use "
+            f"web search to check for any current, state-specific health department alerts "
+            f"for {state}, or global emerging threats with genuine relevance to {state} "
+            "(e.g. via its international travel connections) that aren't already covered by "
+            "the data below. This comes first because it's not easy to find elsewhere in "
+            "this application. If nothing new or relevant turns up, say so briefly rather "
+            "than forcing a connection.\n\n"
+            f"2. DOMESTIC SURVEILLANCE SUMMARY (brief, comes second): a concise summary of "
+            f"{state}'s wastewater, syndromic, and genomic trends from the data below. Keep "
+            "this shorter -- the underlying numbers are already visible on the map and state "
+            "panel, so don't just restate every figure.\n\n"
+            "Name specific sources when citing search results. Be specific, avoid generic filler."
         )
     else:
         data_context = _national_summary(payload)
         scope_instruction = (
-            "Write a multi-paragraph national biothreat briefing. Name specific states and "
-            "pathogens for anything notable in the data below -- worsening wastewater "
-            "categories, rising syndromic trends, fast-growing variants. Then use web search "
-            "to check for CURRENT emerging or re-emerging biothreats worldwide that are NOT "
-            "already covered by the WHO DON alerts or structured data below -- new outbreaks, "
-            "novel pathogens, biosecurity incidents, or significant recent developments in "
-            "ongoing outbreaks (the loaded WHO DON data may be up to several days old). "
-            "Integrate what you find with the loaded data rather than listing search results "
-            "separately. This is for a CDC audience: be specific, avoid generic filler, and "
-            "name your sources when citing something found via search."
+            "Structure this national briefing in two sections, IN THIS ORDER:\n\n"
+            "1. GLOBAL & EMERGING THREATS (lead with this, most substantial section): use web "
+            "search to find CURRENT emerging or re-emerging biothreats worldwide -- new "
+            "outbreaks, novel pathogens, biosecurity incidents, significant recent "
+            "developments -- that are NOT already covered by the WHO DON alerts below (which "
+            "may be several days old). Combine this with the WHO DON alerts themselves. This "
+            "comes first because domestic surveillance numbers are already visible elsewhere "
+            "in this application -- your job here is real-time global threat intelligence "
+            "that isn't easy to find elsewhere.\n\n"
+            "2. DOMESTIC SURVEILLANCE SUMMARY (brief, comes second): a shorter summary of "
+            "anything notable in the wastewater/syndromic/genomic data below -- worsening "
+            "categories, rising trends, fast-growing variants. Keep this concise -- the "
+            "underlying numbers are already visible on the map and state panels.\n\n"
+            "This is for a CDC audience: be specific, avoid generic filler, and name specific "
+            "sources when citing search results."
         )
 
-    prompt = f"{data_context}\n\n{_who_don_context(limit=12)}\n\n{scope_instruction}"
+    # WHO DON context first, matching the desired output order above.
+    prompt = f"{_who_don_context(limit=12)}\n\n{data_context}\n\n{scope_instruction}"
 
     message = _get_client().messages.create(
-        model=SONNET_MODEL, max_tokens=2000, system=SYSTEM_PROMPT,
+        # 16000 confirmed necessary, not just generous: at 2000 (the original
+        # limit) and even 8000, a 5-search national briefing hit
+        # stop_reason="max_tokens" and got cut off mid-response -- search
+        # results + reasoning consume a lot of the output budget before the
+        # model even starts writing the final synthesis. Verified 16000
+        # completes with stop_reason="end_turn" and room to spare.
+        model=SONNET_MODEL, max_tokens=16000, system=SYSTEM_PROMPT,
         tools=[WEB_SEARCH_TOOL],
         messages=[{"role": "user", "content": prompt}],
     )
     content = _extract_text(message.content)
+    truncated = message.stop_reason == "max_tokens"
+    if truncated:
+        # Don't fail silently -- this happened once already at a lower limit
+        # and produced a briefing that quietly dropped the global-alerts
+        # section. Log it so a recurrence is visible instead of just "the
+        # briefing seemed a bit short again."
+        print(f"[ai.briefing] WARNING: response for scope={scope!r} was cut off "
+              f"(stop_reason=max_tokens) despite a 16000 token budget. "
+              f"output_tokens={message.usage.output_tokens}")
+        content += "\n\n*(Note: this response was cut off before completion. Try regenerating.)*"
 
     generated_at = _set_cache(con, cache_key, "briefing", content, SONNET_MODEL,
-                               {"scope": scope, "web_search_enabled": True})
+                               {"scope": scope, "web_search_enabled": True, "truncated": truncated})
     return {"scope": scope, "content": content, "generated_at": generated_at.isoformat(), "cached": False}
