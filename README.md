@@ -56,6 +56,14 @@ uv run python -m etl.travel --weeks 26
 uv run uvicorn main:app --reload   # http://localhost:8000
 ```
 
+Frontend (separate terminal):
+
+```bash
+cd frontend
+pnpm install
+pnpm run dev   # http://localhost:5173, proxies to VITE_API_URL or localhost:8000
+```
+
 ## Status
 
 - [x] Schema designed and validated
@@ -64,8 +72,11 @@ uv run uvicorn main:app --reload   # http://localhost:8000
 - [x] Genomic ETL — CDC Variant Proportions (1,491 rows); Nextstrain deferred
       (most builds checked were stale; would need phylogenetic tree parsing)
 - [x] Travel ETL — BTS passenger volumes + WHO Disease Outbreak News (91 rows)
-- [ ] Frontend map
+- [x] Frontend map — state choropleth (Wastewater/Syndromic/Genomic toggle),
+      airport markers, outbreak alerts panel, live Data Sources view
 - [ ] Composite scoring layer (deferred — HermesBoost integration TBD)
+- [ ] Docker/Render deployment config (measles-hotspot's Dockerfile is a
+      reasonable starting template — not yet adapted for this project)
 
 **120,053 real observations loaded** across all 4 domains as of 2026-09-18.
 Several sources required correcting mid-build after the originally-researched
