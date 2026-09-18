@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from api.sources import router as sources_router
 from api.map import router as map_router
 from api.geojson import router as geojson_router
+from api.ai import router as ai_router
 
 app = FastAPI(
     title="Biothreat Radar API",
@@ -33,6 +34,7 @@ app.add_middleware(
 app.include_router(sources_router)
 app.include_router(map_router)
 app.include_router(geojson_router)
+app.include_router(ai_router)
 
 
 @app.get("/health")

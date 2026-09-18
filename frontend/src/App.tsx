@@ -4,7 +4,10 @@ import { api } from "./api";
 import { BiothreatMap } from "./components/Map";
 import { OutbreakPanel } from "./components/OutbreakPanel";
 import { SourcesPanel } from "./components/SourcesPanel";
-import type { Domain } from "./types";
+import { StateAICard } from "./components/StateAICard";
+import { StateDetailPanel } from "./components/StateDetailPanel";
+import { BriefingModal } from "./components/BriefingModal";
+import type { Domain, Pathogen, ViewMode } from "./types";
 
 type Tab = "map" | "sources";
 
@@ -14,36 +17,30 @@ const DOMAIN_LABEL: Record<Domain, string> = {
   syndromic: "Syndromic",
   genomic: "Genomic",
 };
+const PATHOGENS: Pathogen[] = ["SARS-CoV-2", "Influenza A", "RSV"];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("map");
+  const [viewMode, setViewMode] = useState<ViewMode>("state");
   const [domain, setDomain] = useState<Domain>("wastewater");
+  const [pathogen, setPathogen] = useState<Pathogen>("SARS-CoV-2");
   const [selectedState, setSelectedState] = useState<string | null>(null);
+  const [briefingOpen, setBriefingOpen] = useState(false);
 
   const { data: geojson } = useQuery({
-    queryKey: ["states-geojson"],
-    queryFn: api.statesGeoJson,
-    staleTime: Infinity,
+    queryKey: ["states-geojson"], queryFn: api.statesGeoJson, staleTime: Infinity,
   });
   const { data: statesData } = useQuery({
-    queryKey: ["map-states"],
-    queryFn: api.mapStates,
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["map-states"], queryFn: api.mapStates, staleTime: 5 * 60 * 1000,
   });
   const { data: airportsData } = useQuery({
-    queryKey: ["map-airports"],
-    queryFn: api.mapAirports,
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["map-airports"], queryFn: api.mapAirports, staleTime: 5 * 60 * 1000,
   });
   const { data: alertsData, isLoading: alertsLoading } = useQuery({
-    queryKey: ["outbreak-alerts"],
-    queryFn: () => api.outbreakAlerts(15),
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["outbreak-alerts"], queryFn: () => api.outbreakAlerts(15), staleTime: 5 * 60 * 1000,
   });
   const { data: sourcesData, isLoading: sourcesLoading } = useQuery({
-    queryKey: ["sources"],
-    queryFn: api.sources,
-    staleTime: Infinity,
+    queryKey: ["sources"], queryFn: api.sources, staleTime: Infinity,
   });
 
   const selectedSignals = selectedState ? statesData?.states[selectedState] : undefined;
@@ -53,14 +50,13 @@ export default function App() {
       display: "flex", flexDirection: "column", height: "100vh",
       fontFamily: "'Trebuchet MS', Arial, sans-serif", background: "#f6f8fc",
     }}>
-      {/* Header */}
       <header style={{
         background: "#1A2744", color: "#fff", padding: "0 24px",
-        display: "flex", alignItems: "center", gap: 24, flexShrink: 0, height: 52,
+        display: "flex", alignItems: "center", gap: 20, flexShrink: 0, height: 52, flexWrap: "wrap",
       }}>
         <div style={{ fontSize: 15, fontWeight: 700 }}>Biothreat Radar</div>
 
-        <nav style={{ display: "flex", gap: 2, marginLeft: 16 }}>
+        <nav style={{ display: "flex", gap: 2 }}>
           {(["map", "sources"] as Tab[]).map((t) => (
             <button
               key={t}
@@ -82,30 +78,43 @@ export default function App() {
         </nav>
 
         {tab === "map" && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6, marginLeft: "auto",
-            background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: 6, padding: "0 4px", height: 32,
-          }}>
-            {DOMAINS.map((d) => (
-              <button
-                key={d}
-                onClick={() => setDomain(d)}
-                style={{
-                  background: domain === d ? "#2E86DE" : "transparent",
-                  color: domain === d ? "#fff" : "#7A99B8",
-                  border: "none", borderRadius: 4, padding: "0 10px", height: 24,
-                  fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", cursor: "pointer",
-                }}
-              >
-                {DOMAIN_LABEL[d]}
-              </button>
-            ))}
-          </div>
+          <>
+            <ToggleGroup
+              options={[{ v: "state", label: "State" }, { v: "airport", label: "Airport" }]}
+              value={viewMode}
+              onChange={(v) => setViewMode(v as ViewMode)}
+            />
+
+            {viewMode === "state" && (
+              <>
+                <ToggleGroup
+                  options={DOMAINS.map((d) => ({ v: d, label: DOMAIN_LABEL[d] }))}
+                  value={domain}
+                  onChange={(v) => setDomain(v as Domain)}
+                />
+                <ToggleGroup
+                  options={PATHOGENS.map((p) => ({ v: p, label: p }))}
+                  value={pathogen}
+                  onChange={(v) => setPathogen(v as Pathogen)}
+                  disabled={domain === "genomic"}
+                  disabledTitle="Genomic tracking (CDC Variant Proportions) is SARS-CoV-2 only"
+                />
+              </>
+            )}
+
+            <button
+              onClick={() => setBriefingOpen(true)}
+              style={{
+                marginLeft: "auto", background: "#2E86DE", color: "#fff", border: "none",
+                borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              Generate Briefing
+            </button>
+          </>
         )}
       </header>
 
-      {/* Body */}
       <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
         {tab === "map" && (
           <div style={{ display: "flex", height: "100%", width: "100%" }}>
@@ -114,48 +123,106 @@ export default function App() {
                 geojson={geojson}
                 statesData={statesData}
                 airports={airportsData?.airports ?? []}
+                viewMode={viewMode}
                 domain={domain}
+                pathogen={pathogen}
                 selectedState={selectedState}
                 onSelectState={setSelectedState}
               />
               <div style={{
                 position: "absolute", bottom: 16, left: 16, zIndex: 1000,
                 background: "#fff", borderRadius: 8, padding: "10px 14px",
-                boxShadow: "0 2px 12px rgba(0,0,0,0.12)", fontSize: 11, maxWidth: 260,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.12)", fontSize: 11, maxWidth: 280,
               }}>
-                <div style={{ fontWeight: 700, color: "#1A2744", marginBottom: 4 }}>
-                  {DOMAIN_LABEL[domain]} — SARS-CoV-2
-                </div>
-                <div style={{ color: "#7A92AB", lineHeight: 1.5 }}>
-                  Color scaled to the currently-loaded range for this domain.
-                  Blue circles = international arrivals by airport.
-                  Gray = no data. Click a state for details.
-                </div>
+                {viewMode === "state" ? (
+                  <>
+                    <div style={{ fontWeight: 700, color: "#1A2744", marginBottom: 4 }}>
+                      {DOMAIN_LABEL[domain]} — {pathogen}
+                    </div>
+                    <div style={{ color: "#7A92AB", lineHeight: 1.5 }}>
+                      {domain === "wastewater"
+                        ? "Fixed severity scale (Very Low→Very High) — same color means the same thing every week."
+                        : "Color scaled to the currently-loaded range for this domain."}
+                      {" "}Gray = no data. Click a state for details.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontWeight: 700, color: "#1A2744", marginBottom: 4 }}>
+                      International Arrivals by Airport
+                    </div>
+                    <div style={{ color: "#7A92AB", lineHeight: 1.5 }}>
+                      Circle size = inbound passenger volume (BTS T-100, ~9 month reporting lag).
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             <div style={{ flex: "0 0 35%", height: "100%", overflowY: "auto", borderLeft: "1px solid #e0e6f0" }}>
-              {selectedState && (
-                <div style={{ padding: 16, borderBottom: "1px solid #e8eef6" }}>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#1A2744" }}>{selectedState}</h3>
-                  {DOMAINS.map((d) => {
-                    const sig = selectedSignals?.[d];
-                    return (
-                      <div key={d} style={{ fontSize: 12, margin: "4px 0", color: "#333" }}>
-                        <strong>{DOMAIN_LABEL[d]}:</strong>{" "}
-                        {sig ? `${sig.value.toFixed(3)} (${sig.period_end}, ${sig.granularity})` : "no data"}
-                      </div>
-                    );
-                  })}
-                </div>
+              {viewMode === "state" ? (
+                selectedState ? (
+                  <div style={{ padding: 16 }}>
+                    <StateAICard state={selectedState} />
+                    <StateDetailPanel stateName={selectedState} signals={selectedSignals} />
+                  </div>
+                ) : (
+                  <div style={{ padding: 16, fontSize: 12, color: "#7A92AB" }}>
+                    Click a state on the map to see its wastewater, syndromic, and genomic trends,
+                    plus an AI analysis of anything notable.
+                  </div>
+                )
+              ) : (
+                <OutbreakPanel alerts={alertsData?.alerts} isLoading={alertsLoading} />
               )}
-              <OutbreakPanel alerts={alertsData?.alerts} isLoading={alertsLoading} />
             </div>
           </div>
         )}
 
         {tab === "sources" && <SourcesPanel sources={sourcesData?.sources} isLoading={sourcesLoading} />}
       </div>
+
+      {briefingOpen && (
+        <BriefingModal defaultState={selectedState} onClose={() => setBriefingOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+function ToggleGroup<T extends string>({
+  options, value, onChange, disabled, disabledTitle,
+}: {
+  options: { v: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  disabled?: boolean;
+  disabledTitle?: string;
+}) {
+  return (
+    <div
+      title={disabled ? disabledTitle : undefined}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
+        borderRadius: 6, padding: "0 4px", height: 32, opacity: disabled ? 0.45 : 1,
+      }}
+    >
+      {options.map(({ v, label }) => (
+        <button
+          key={v}
+          onClick={() => !disabled && onChange(v)}
+          disabled={disabled}
+          style={{
+            background: value === v ? "#2E86DE" : "transparent",
+            color: value === v ? "#fff" : "#7A99B8",
+            border: "none", borderRadius: 4, padding: "0 10px", height: 24,
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
+            cursor: disabled ? "default" : "pointer",
+          }}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

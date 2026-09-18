@@ -8,3 +8,5 @@ services:
     envVars:
       - key: ALLOWED_ORIGINS
         value: "*"       # same-origin in prod (frontend served by FastAPI); wildcard is safe for a demo
+      - key: ANTHROPIC_API_KEY
+        sync: false      # set this secret in the Render dashboard -- powers the AI Analyst endpoints

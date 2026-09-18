@@ -82,3 +82,16 @@ CREATE INDEX IF NOT EXISTS idx_fact_geo_period ON fact_observation(geo_id, perio
 CREATE INDEX IF NOT EXISTS idx_fact_domain     ON fact_observation(domain);
 CREATE INDEX IF NOT EXISTS idx_fact_pathogen   ON fact_observation(pathogen_id);
 CREATE INDEX IF NOT EXISTS idx_fact_source     ON fact_observation(source_id);
+
+-- ============================================================
+-- AI Analyst cache -- no FK (nothing references or is referenced here, so
+-- none of the dim_* upsert limitations above apply; plain UPDATE is fine).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ai_narrative_cache (
+    cache_key     VARCHAR PRIMARY KEY,   -- 'state-card:Texas' | 'briefing:national' | 'briefing:Texas'
+    kind          VARCHAR NOT NULL,      -- 'state_card' | 'briefing'
+    content       VARCHAR NOT NULL,
+    model         VARCHAR,
+    generated_at  TIMESTAMP DEFAULT current_timestamp,
+    data_snapshot JSON                   -- exact figures fed into the prompt, for traceability
+);

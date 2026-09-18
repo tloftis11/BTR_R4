@@ -9,6 +9,9 @@ backend/.env
 # public APIs, not checked in (unlike measles-hotspot's one-time synthetic
 # seed, this data is meant to be re-pulled fresh, not baked in once).
 data/*.duckdb
+data/*.duckdb.wal
 
 frontend/node_modules/
 frontend/dist/
+
+*.log

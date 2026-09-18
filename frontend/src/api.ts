@@ -1,4 +1,7 @@
-import type { StatesResponse, AirportsResponse, AlertsResponse, SourcesResponse } from "./types";
+import type {
+  StatesResponse, AirportsResponse, AlertsResponse, SourcesResponse,
+  StateCardResponse, BriefingResponse,
+} from "./types";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -14,4 +17,11 @@ export const api = {
   outbreakAlerts: (limit = 20) => get<AlertsResponse>(`/api/map/outbreak-alerts?limit=${limit}`),
   sources: () => get<SourcesResponse>("/api/sources"),
   statesGeoJson: () => get<GeoJSON.FeatureCollection>("/api/geojson/states"),
+  stateCard: (state: string) =>
+    get<StateCardResponse>(`/api/ai/state-card?state=${encodeURIComponent(state)}`),
+  briefing: (state?: string, regenerate = false) =>
+    get<BriefingResponse>(
+      `/api/ai/briefing${state ? `?state=${encodeURIComponent(state)}` : ""}` +
+      `${regenerate ? `${state ? "&" : "?"}regenerate=true` : ""}`
+    ),
 };

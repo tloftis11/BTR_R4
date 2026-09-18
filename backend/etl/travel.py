@@ -17,7 +17,9 @@ Two sources (dim_source ids 12 and 13):
    titles produce one row per matched country; unmatched titles fall back to
    the 'global' geo row rather than being dropped. This is a best-effort
    proxy signal, documented as fragile in dim_source -- not a substitute for
-   a real structured feed.
+   a real structured feed. raw_payload includes WHO's own Overview/
+   Assessment/Epidemiology narrative fields (HTML-embedded) -- the actual
+   substance an AI briefing needs, not just headlines.
 
 Run: uv run python -m etl.travel [--weeks N]
 """
@@ -196,7 +198,11 @@ def run_who_don(con, weeks_back: int, country_geo: dict[str, int],
                 "$orderby": "PublicationDateAndTime desc",
                 "$top": 100,
                 "$skip": skip,
-                "$select": "Id,Title,PublicationDate",
+                # Overview/Assessment/Epidemiology are WHO's own narrative
+                # fields (HTML-embedded) -- the actual substance an AI
+                # briefing needs. Originally only Id/Title/PublicationDate
+                # were fetched, which left nothing but headlines to work with.
+                "$select": "Id,Title,PublicationDate,Overview,Assessment,Epidemiology",
             },
             timeout=30.0,
         )
