@@ -1,0 +1,12 @@
+# Not an actual multi-package workspace -- this file exists solely to set
+# non-auth pnpm config (pnpm 11+ moved these out of .npmrc).
+#
+# minimumReleaseAge: pnpm's supply-chain guard that rejects installing any
+# lockfile-pinned version published too recently (default 1440 min / 24h as
+# of pnpm 11). Our lockfile is regenerated periodically and can legitimately
+# pin same-day patch releases of common tooling (babel, browserslist data,
+# etc.) -- set to 0 rather than let CI fail on packages we already reviewed
+# when the lockfile was generated. Tradeoff: this disables that specific
+# protection for this project; reasonable for a demo, worth reconsidering
+# if this ever handles anything sensitive.
+minimumReleaseAge: 0

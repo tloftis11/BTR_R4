@@ -4,7 +4,14 @@ WORKDIR /app/frontend
 
 RUN npm install -g pnpm
 
-COPY frontend/package.json frontend/pnpm-lock.yaml* ./
+# PNPM_CONFIG_MINIMUM_RELEASE_AGE=0: defensive belt-and-suspenders alongside
+# frontend/pnpm-workspace.yaml's minimumReleaseAge:0 -- the env var is the
+# only form honored across pnpm's CLI flag inconsistencies (a --config.* CLI
+# flag is silently ignored on pnpm 12's Rust CLI). See pnpm-workspace.yaml
+# for why this check is disabled at all.
+ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=0
+
+COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/pnpm-workspace.yaml* ./
 RUN pnpm install --frozen-lockfile
 
 COPY frontend/ .
