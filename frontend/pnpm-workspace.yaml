@@ -10,3 +10,11 @@
 # protection for this project; reasonable for a demo, worth reconsidering
 # if this ever handles anything sensitive.
 minimumReleaseAge: 0
+
+# pnpm 11 made strictDepBuilds default to true (was a warning in 10.x),
+# so any dependency with an install/postinstall script now hard-fails a
+# frozen-lockfile install unless explicitly approved. esbuild's postinstall
+# fetches its platform-specific binary -- normal and required, not
+# suppressed -- so it's approved (true), not blocked (false).
+allowBuilds:
+  esbuild: true

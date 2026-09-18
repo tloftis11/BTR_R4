@@ -2,7 +2,11 @@
 FROM node:20-slim AS frontend-builder
 WORKDIR /app/frontend
 
-RUN npm install -g pnpm
+# Pinned to match local dev exactly (`pnpm --version`) -- floating "latest"
+# is what caused two straight build failures here (pnpm 11 changed two
+# separate defaults to be stricter: minimumReleaseAge and strictDepBuilds).
+# Bump this deliberately, in step with frontend/pnpm-lock.yaml, not silently.
+RUN npm install -g pnpm@10.34.5
 
 # PNPM_CONFIG_MINIMUM_RELEASE_AGE=0: defensive belt-and-suspenders alongside
 # frontend/pnpm-workspace.yaml's minimumReleaseAge:0 -- the env var is the
