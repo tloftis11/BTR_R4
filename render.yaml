@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: biothreat-radar
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    plan: starter        # always-on; upgrade to standard for more RAM if needed
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: "*"       # same-origin in prod (frontend served by FastAPI); wildcard is safe for a demo
