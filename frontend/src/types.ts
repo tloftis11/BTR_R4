@@ -1,6 +1,9 @@
 export type Pathogen = "SARS-CoV-2" | "Influenza A" | "RSV";
-export type Domain = "wastewater" | "syndromic" | "genomic";
-export type ViewMode = "state" | "airport";
+// Map-colorable domains only. Genomic dropped as a map layer -- HHS-region
+// sharing made it too blocky/uninformative spatially -- but genomic data is
+// still returned by the API and shown as text in StateDetailPanel + the AI
+// endpoints, where it's actually useful (see GenomicSignal below).
+export type Domain = "wastewater" | "syndromic";
 
 export interface WastewaterSignal {
   category_distribution: Record<string, number>;

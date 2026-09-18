@@ -28,6 +28,24 @@ BRIEFING_TTL = timedelta(hours=6)
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 SONNET_MODEL = "claude-sonnet-5"
 
+# Web search is only wired into /api/ai/briefing (deliberately triggered),
+# not the auto-loading state card -- it adds real latency and per-search
+# cost, which is fine for a button click but not for something that fires
+# on every map interaction. Restricted to authoritative health/news sources
+# so a "biothreat radar" briefing doesn't end up citing random blogs.
+WEB_SEARCH_TOOL = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+    "max_uses": 5,
+    # apnews.com and reuters.com were tried and rejected by the API --
+    # "not accessible to our user agent" (their crawler is blocked there).
+    # Confirmed working: the sources below.
+    "allowed_domains": [
+        "cdc.gov", "who.int", "ecdc.europa.eu", "promedmail.org",
+        "gov.uk", "outbreaknewstoday.com",
+    ],
+}
+
 SYSTEM_PROMPT = (
     "You are an analyst for a CDC biothreat radar program, synthesizing "
     "wastewater, syndromic, and genomic surveillance data plus global "
@@ -41,7 +59,10 @@ SYSTEM_PROMPT = (
     "Hantavirus, Yellow Fever, etc.) that has no US domestic tracking at all "
     "-- those are the actual emerging-threat signals, not routine seasonal "
     "COVID/flu/RSV levels. Be concrete: name states, pathogens, and numbers. "
-    "Do not hedge with vague language like 'may be of interest.'"
+    "Do not hedge with vague language like 'may be of interest.' When you "
+    "have web search available and use it, name the specific source (e.g. "
+    "'per WHO' or 'per CDC') for anything you cite from search, and clearly "
+    "distinguish it from the loaded structured data."
 )
 
 _client: anthropic.Anthropic | None = None
@@ -55,6 +76,15 @@ def _get_client() -> anthropic.Anthropic:
             raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
         _client = anthropic.Anthropic(api_key=api_key)
     return _client
+
+
+def _extract_text(content_blocks) -> str:
+    """Concatenate all text blocks in a response. Needed once web search is
+    enabled -- the content list then also contains server_tool_use and
+    web_search_tool_result blocks interleaved with text, so grabbing
+    content[0].text alone would silently truncate or grab the wrong block.
+    """
+    return "".join(getattr(block, "text", "") for block in content_blocks if getattr(block, "type", None) == "text")
 
 
 def _get_cached(con, cache_key: str, ttl: timedelta) -> tuple[str, datetime] | None:
@@ -187,7 +217,7 @@ def state_card(state: str, regenerate: bool = False):
         model=HAIKU_MODEL, max_tokens=300, system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     )
-    content = message.content[0].text
+    content = _extract_text(message.content)
 
     generated_at = _set_cache(con, cache_key, "state_card", content, HAIKU_MODEL, {"state": state})
     return {"state": state, "content": content, "generated_at": generated_at.isoformat(), "cached": False}
@@ -214,26 +244,37 @@ def briefing(state: str | None = None, regenerate: bool = False):
         data_context = _format_state_signals(state, signals)
         scope_instruction = (
             f"Write a multi-paragraph briefing on {state}'s current biothreat picture, "
-            "covering wastewater, syndromic, and genomic trends with specific numbers. "
-            "Mention global alerts only if genuinely relevant to this state."
+            "covering wastewater, syndromic, and genomic trends from the data below, with "
+            "specific numbers. Then use web search to check for any current, state-specific "
+            f"health department alerts for {state}, or global emerging threats with genuine "
+            f"relevance to {state} (e.g. via its international travel connections) that "
+            "aren't already covered by the loaded data below. It's fine to find nothing new "
+            "via search -- don't force a connection that isn't there."
         )
     else:
         data_context = _national_summary(payload)
         scope_instruction = (
-            "Write a multi-paragraph national biothreat briefing. Name specific states "
-            "and pathogens for anything notable -- worsening wastewater categories, rising "
-            "syndromic trends, fast-growing variants -- and cover the global outbreak "
-            "alerts as real emerging threats with actual substance, not just headlines. "
-            "This is for a CDC audience: be specific, avoid generic filler."
+            "Write a multi-paragraph national biothreat briefing. Name specific states and "
+            "pathogens for anything notable in the data below -- worsening wastewater "
+            "categories, rising syndromic trends, fast-growing variants. Then use web search "
+            "to check for CURRENT emerging or re-emerging biothreats worldwide that are NOT "
+            "already covered by the WHO DON alerts or structured data below -- new outbreaks, "
+            "novel pathogens, biosecurity incidents, or significant recent developments in "
+            "ongoing outbreaks (the loaded WHO DON data may be up to several days old). "
+            "Integrate what you find with the loaded data rather than listing search results "
+            "separately. This is for a CDC audience: be specific, avoid generic filler, and "
+            "name your sources when citing something found via search."
         )
 
     prompt = f"{data_context}\n\n{_who_don_context(limit=12)}\n\n{scope_instruction}"
 
     message = _get_client().messages.create(
-        model=SONNET_MODEL, max_tokens=1200, system=SYSTEM_PROMPT,
+        model=SONNET_MODEL, max_tokens=2000, system=SYSTEM_PROMPT,
+        tools=[WEB_SEARCH_TOOL],
         messages=[{"role": "user", "content": prompt}],
     )
-    content = message.content[0].text
+    content = _extract_text(message.content)
 
-    generated_at = _set_cache(con, cache_key, "briefing", content, SONNET_MODEL, {"scope": scope})
+    generated_at = _set_cache(con, cache_key, "briefing", content, SONNET_MODEL,
+                               {"scope": scope, "web_search_enabled": True})
     return {"scope": scope, "content": content, "generated_at": generated_at.isoformat(), "cached": False}
