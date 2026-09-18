@@ -1,0 +1,14 @@
+backend/.venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+backend/.env
+.env
+
+# Generated DB -- fully reproducible via seed/*.py + etl/*.py against live
+# public APIs, not checked in (unlike measles-hotspot's one-time synthetic
+# seed, this data is meant to be re-pulled fresh, not baked in once).
+data/*.duckdb
+
+frontend/node_modules/
+frontend/dist/
